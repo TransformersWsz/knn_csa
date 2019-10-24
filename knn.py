@@ -6,6 +6,7 @@
 # @Brief   : implement the chinese sentiment analysis with knn algorithm, see detail in README
 
 import math
+from random import randint
 
 
 class KNN(object):
@@ -13,27 +14,6 @@ class KNN(object):
     def __init__(self):
         # self._mode = {"unigram": 1, "bigram": 2}
         pass
-
-    def top_k(self, sorted_arr: list, K: int, element: tuple) -> None:
-        """
-        维护一个大小为 K 的有序数组
-        :param sorted_arr: 有序数组
-        :param size: 数组大小：K
-        :param element: 待插入的元素
-        :return: None
-        """
-        flag = 0
-        for index, item in enumerate(sorted_arr):
-            if element[0] >= item[0]:
-                flag = 1
-                break
-        if flag == 1:
-            if len(sorted_arr) == K:
-                sorted_arr.pop()
-            sorted_arr.insert(index, element)
-        else:
-            if len(sorted_arr) != K:
-                sorted_arr.append(element)
 
     def segment(self, sentence: str, mode: int) -> list:
         """
@@ -43,21 +23,11 @@ class KNN(object):
         :return: 分词后的列表
         """
         word_list = []
-        for i in range(len(sentence)//mode+1):
-            word = sentence[i*mode:(i+1)*mode]
-            if len(word):
+        for i in range(len(sentence)):
+            word = sentence[i:(i+mode)]
+            if len(word) % mode == 0:
                 word_list.append(word)
         return word_list
-
-    def get_hybrid_segment_list(self, sentence: str) -> list:
-        """
-        使用 unigram 和 bigram 两种模式对中文语句进行分词，并将分词结果合并
-        :param sentence: 一条中文语句
-        :return: 两种分词模式的结果合并
-        """
-        unigram_segment = self.segment(sentence, 1)
-        bigram_segment = self.segment(sentence, 2)
-        return unigram_segment + bigram_segment
 
     def modulus(self, d: dict) -> float:
         """
@@ -71,8 +41,11 @@ class KNN(object):
         return math.sqrt(sum)
 
     def cosine(self, a: dict, b: dict) -> float:
+        """计算两个向量的余弦距离"""
         mod_a = self.modulus(a)
         mod_b = self.modulus(b)
+        if mod_a == 0 or mod_b == 0:
+            return 0
 
         numerator = 0
         for pos, val in a.items():
@@ -80,21 +53,132 @@ class KNN(object):
                 numerator += val * b[pos]
         return numerator / (mod_a * mod_b)
 
-    def construct_sentence_vector(self, segment_a: list, segment_b: list) -> list:
+    def get_hybrid_segment_list(self, sentence: str) -> list:
         """
-        根据分好词的列表构造句向量
-        :param segment_a: 分词列表a
-        :param segment_b: 分词列表b
+        使用 unigram 和 bigram 两种模式对中文语句进行分词，并将分词结果合并
+        :param sentence: 一条中文语句
+        :return: 两种分词模式的结果合并
+        """
+        unigram_segment = self.segment(sentence, 1)
+        bigram_segment = self.segment(sentence, 2)
+        return unigram_segment + bigram_segment
+
+    def get_sentence_vectors(self, sentence_a: str, sentence_b: str) -> tuple:
+        """
+        构造句向量
+        :param sentence_a: 句子a
+        :param sentence_b: 句子b
         :return: a 和 b 的句向量
         """
+        segment_a = self.get_hybrid_segment_list(sentence_a)
+        segment_b = self.get_hybrid_segment_list(sentence_b)
+
+        dict_a = {}
+        dict_b = {}
+        for index_a, item_a in enumerate(segment_a):
+            for index_b, item_b in enumerate(segment_b):
+                if item_a == item_b:
+                    dict_a["{}".format(index_a)] = dict_b["{}".format(index_b)] = 1
+        return dict_a, dict_b
+
+    def similarity(self, sentence_a: str, sentence_b: str) -> float:
+        """
+        计算两个句子的相似度
+        :param sentence_a: 句子a
+        :param sentence_b: 句子b
+        :return: 余弦距离
+        """
+        dict_a, dict_b = self.get_sentence_vectors(sentence_a, sentence_b)
+        distance = self.cosine(dict_a, dict_b)
+        return distance
+
+    def read_file(self, filepath: str) -> list:
+        """
+        读取文件，返回句子和类别构成的列表
+        :param filepath: 文件路径
+        :return: [(sentence, category), ...]
+        """
+        result = []
+        with open(filepath, "r", encoding="utf8") as fr:
+            for line in fr:
+                line = line.strip()
+                info = line.split("_!_")
+                category = info[1]
+                sentence = info[-2]
+                result.append((sentence, category))
+        return result
+
+    def top_k(self, sorted_arr: list, K: int, element: tuple) -> None:
+        """
+        维护一个大小为 K 的有序数组
+        :param sorted_arr: 有序数组
+        :param size: 数组大小：K
+        :param element: 待插入的元素
+        :return: None
+        """
+        flag = 0
+        for index, item in enumerate(sorted_arr):
+            if element[0] > item[0]:
+                flag = 1
+                break
+        if flag == 1:
+            if len(sorted_arr) == K:
+                sorted_arr.pop()
+            sorted_arr.insert(index, element)
+        else:
+            if len(sorted_arr) != K:
+                sorted_arr.append(element)
+
+    def get_most_topK(self, sorted_arr: list) -> str:
+        """获取K个元素中出现次数最多的类别"""
+        d = {}
+        for distance, category in sorted_arr:
+            if category not in d:
+                d[category] = 1
+            else:
+                d[category] += 1
+        max_cate = None
+        max_freq = 0
+        for cate, frequency in d.items():
+            if max_freq < frequency:
+                max_cate = cate
+                max_freq = frequency
+        return max_cate
+
+    def classify(self, train: list, test: list, K: int) -> float:
+        """
+        测试
+        :param train: 训练集
+        :param test: 测试集
+        :param K: 邻居个数
+        :return: 准确率
+        """
+        correct_num = 0    # 预测类别正确的个数
+        for test_sentence, test_category in test:
+            sorted_arr = []
+            for train_sentence, train_category in train:
+                distance = self.similarity(test_sentence, train_sentence)
+                self.top_k(sorted_arr, K, (distance, train_category))
+            predict_cate = self.get_most_topK(sorted_arr)
+
+            if test_category == predict_cate:
+                correct_num += 1
+            print("{} {} {} {} 已预测正确个数为 {}".format(test_sentence, test_category, predict_cate, test_category == predict_cate, correct_num))
+        return correct_num/len(test)
         
 
 if __name__ == "__main__":
-    a = {"0": 1, "2": 4}
-    b = {"1:": 1, "2": 2}
-
     solution = KNN()
-    print(solution.cosine(a, b))
-    sentence = "难得你这么闲？"
-    result = solution.get_hybrid_segment_list(sentence)
-    print(result)
+    filepath = "./data.txt"
+    data_set = solution.read_file(filepath)
+
+    data_set = data_set[:20000]
+    test_num = 3000
+    test_set = []
+    for i in range(test_num):
+        index = randint(0, len(data_set)-1)
+        test_set.append(data_set[index])
+        data_set.pop(index)
+    accuracy = solution.classify(data_set, test_set, 10)
+    print(accuracy)
+
