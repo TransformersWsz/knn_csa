@@ -6,7 +6,7 @@
 # @Brief   : implement the chinese sentiment analysis with knn algorithm, see detail in README
 
 import math
-from random import randint
+import random
 
 
 class KNN(object):
@@ -92,7 +92,7 @@ class KNN(object):
         distance = self.cosine(dict_a, dict_b)
         return distance
 
-    def read_file(self, filepath: str) -> list:
+    def read_file(self, filepath: str, polarity: str) -> list:
         """
         读取文件，返回句子和类别构成的列表
         :param filepath: 文件路径
@@ -102,10 +102,7 @@ class KNN(object):
         with open(filepath, "r", encoding="utf8") as fr:
             for line in fr:
                 line = line.strip()
-                info = line.split("_!_")
-                category = info[1]
-                sentence = info[-2]
-                result.append((sentence, category))
+                result.append((line, polarity))
         return result
 
     def top_k(self, sorted_arr: list, K: int, element: tuple) -> None:
@@ -154,6 +151,7 @@ class KNN(object):
         :return: 准确率
         """
         correct_num = 0    # 预测类别正确的个数
+        wrong_num = 0    # 预测类别错误的个数
         for test_sentence, test_category in test:
             sorted_arr = []
             for train_sentence, train_category in train:
@@ -163,20 +161,25 @@ class KNN(object):
 
             if test_category == predict_cate:
                 correct_num += 1
-            print("{} {} {} {} 已预测正确个数为 {}".format(test_sentence, test_category, predict_cate, test_category == predict_cate, correct_num))
+            else:
+                wrong_num += 1
+            print("{} {} {} {} 已预测正确个数为 {} 已预测错误个数为 {}".format(test_sentence, test_category, predict_cate, test_category == predict_cate, correct_num, wrong_num))
         return correct_num/len(test)
         
 
 if __name__ == "__main__":
     solution = KNN()
-    filepath = "./data.txt"
-    data_set = solution.read_file(filepath)
+    pos_filepath = r"C:\Users\antco\Desktop\positive.txt"
+    neg_filepath = r"C:\Users\antco\Desktop\negative.txt"
+    pos_data_set = solution.read_file(pos_filepath, "positive")
+    neg_data_set = solution.read_file(neg_filepath, "negative")
+    data_set = pos_data_set + neg_data_set
+    random.shuffle(data_set)
 
-    data_set = data_set[:20000]
-    test_num = 3000
+    test_num = len(data_set)//5
     test_set = []
     for i in range(test_num):
-        index = randint(0, len(data_set)-1)
+        index = random.randint(1, len(data_set)-1)
         test_set.append(data_set[index])
         data_set.pop(index)
     accuracy = solution.classify(data_set, test_set, 10)
