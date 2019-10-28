@@ -12,8 +12,7 @@ import random
 class KNN(object):
 
     def __init__(self):
-        # self._mode = {"unigram": 1, "bigram": 2}
-        pass
+        self._word_dict = {}
 
     def segment(self, sentence: str, mode: int) -> list:
         """
@@ -27,7 +26,11 @@ class KNN(object):
             word = sentence[i:(i+mode)]
             if len(word) % mode == 0:
                 word_list.append(word)
+                self._word_dict[word] = len(self._word_dict)
         return word_list
+
+    def get_sentence_vector(self, sentence: str) -> dict:
+        pass
 
     def modulus(self, d: dict) -> float:
         """
