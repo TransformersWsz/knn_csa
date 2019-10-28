@@ -7,6 +7,7 @@
 
 import math
 import random
+import re
 
 
 class KNN(object):
@@ -14,41 +15,32 @@ class KNN(object):
     def __init__(self):
         self._word_dict = {}
 
-    def segment(self, sentence: str, mode: int) -> list:
+    def extract_chinese(self, sentence: str) -> str:
+        """过滤掉句子中的非中文字符"""
+        pattern = "[\u4e00-\u9fa5]+"
+        regex = re.compile(pattern)
+        l = regex.findall(sentence)
+        return "".join(l)
+
+    def segment(self, sentence: str, mode: int) -> dict:
         """
         对中文语句进行分词
         :param sentence: 一条中文语句
         :param mode: 分词模式，有 {"unigram": 1, "bigram": 2}
-        :return: 分词后的列表
+        :return: 句向量
         """
-        word_list = []
-        for i in range(len(sentence)):
+        sentence_vector = {}
+        for i in range(len(sentence)+1-mode):
             word = sentence[i:(i+mode)]
-            if len(word) % mode == 0:
-                word_list.append(word)
+            if word not in self._word_dict:
                 self._word_dict[word] = len(self._word_dict)
-        return word_list
-
-    def get_sentence_vector(self, sentence: str) -> dict:
-        pass
-
-    def modulus(self, d: dict) -> float:
-        """
-        计算向量的模
-        :param d: 向量
-        :return: 模
-        """
-        sum = 0
-        for val in d.values():
-            sum += val * val
-        return math.sqrt(sum)
+            sentence_vector[self._word_dict[word]] = 1
+        return sentence_vector
 
     def cosine(self, a: dict, b: dict) -> float:
         """计算两个向量的余弦距离"""
-        mod_a = self.modulus(a)
-        mod_b = self.modulus(b)
-        if mod_a == 0 or mod_b == 0:
-            return 0
+        mod_a = math.sqrt(len(a))
+        mod_b = math.sqrt(len(b))
 
         numerator = 0
         for pos, val in a.items():
