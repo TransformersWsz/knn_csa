@@ -6,7 +6,7 @@
 # @Brief   : implement the chinese sentiment analysis with knn algorithm, see detail in README
 
 import math
-import random
+import time
 import re
 
 
@@ -17,7 +17,7 @@ class KNN(object):
 
     def extract_chinese(self, sentence: str) -> str:
         """过滤掉句子中的非中文字符"""
-        pattern = "[\u4e00-\u9fa5]+"
+        pattern = "[\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a]"
         regex = re.compile(pattern)
         l = regex.findall(sentence)
         return "".join(l)
@@ -34,7 +34,7 @@ class KNN(object):
             word = sentence[i:(i+mode)]
             if word not in self._word_dict:
                 self._word_dict[word] = len(self._word_dict)
-            sentence_vector[self._word_dict[word]] = 1
+            sentence_vector["{}".format(self._word_dict[word])] = 1
         return sentence_vector
 
     def cosine(self, a: dict, b: dict) -> float:
@@ -48,33 +48,15 @@ class KNN(object):
                 numerator += val * b[pos]
         return numerator / (mod_a * mod_b)
 
-    def get_hybrid_segment_list(self, sentence: str) -> list:
+    def get_sentence_vector(self, sentence: str) -> dict:
         """
-        使用 unigram 和 bigram 两种模式对中文语句进行分词，并将分词结果合并
-        :param sentence: 一条中文语句
-        :return: 两种分词模式的结果合并
+        获取文本向量
+        :param sentence: 文本
+        :return: unigram 和 bigram 组成的 dict
         """
-        unigram_segment = self.segment(sentence, 1)
-        bigram_segment = self.segment(sentence, 2)
-        return unigram_segment + bigram_segment
-
-    def get_sentence_vectors(self, sentence_a: str, sentence_b: str) -> tuple:
-        """
-        构造句向量
-        :param sentence_a: 句子a
-        :param sentence_b: 句子b
-        :return: a 和 b 的句向量
-        """
-        segment_a = self.get_hybrid_segment_list(sentence_a)
-        segment_b = self.get_hybrid_segment_list(sentence_b)
-
-        dict_a = {}
-        dict_b = {}
-        for index_a, item_a in enumerate(segment_a):
-            for index_b, item_b in enumerate(segment_b):
-                if item_a == item_b:
-                    dict_a["{}".format(index_a)] = dict_b["{}".format(index_b)] = 1
-        return dict_a, dict_b
+        unigram_d = self.segment(sentence, 1)
+        bigram_d = self.segment(sentence, 2)
+        return dict(unigram_d, **bigram_d)
 
     def similarity(self, sentence_a: str, sentence_b: str) -> float:
         """
@@ -83,7 +65,8 @@ class KNN(object):
         :param sentence_b: 句子b
         :return: 余弦距离
         """
-        dict_a, dict_b = self.get_sentence_vectors(sentence_a, sentence_b)
+        dict_a = self.get_sentence_vector(sentence_a)
+        dict_b = self.get_sentence_vector(sentence_b)
         distance = self.cosine(dict_a, dict_b)
         return distance
 
@@ -97,7 +80,9 @@ class KNN(object):
         with open(filepath, "r", encoding="utf8") as fr:
             for line in fr:
                 line = line.strip()
-                result.append((line, polarity))
+                line = self.extract_chinese(line)
+                if len(line):
+                    result.append((self.extract_chinese(line), polarity))
         return result
 
     def top_k(self, sorted_arr: list, K: int, element: tuple) -> None:
@@ -109,14 +94,14 @@ class KNN(object):
         :return: None
         """
         flag = 0
-        for index, item in enumerate(sorted_arr):
+        for idx, item in enumerate(sorted_arr):
             if element[0] > item[0]:
                 flag = 1
                 break
         if flag == 1:
             if len(sorted_arr) == K:
                 sorted_arr.pop()
-            sorted_arr.insert(index, element)
+            sorted_arr.insert(idx, element)
         else:
             if len(sorted_arr) != K:
                 sorted_arr.append(element)
@@ -163,20 +148,23 @@ class KNN(object):
         
 
 if __name__ == "__main__":
-    solution = KNN()
-    pos_filepath = r"C:\Users\antco\Desktop\positive.txt"
-    neg_filepath = r"C:\Users\antco\Desktop\negative.txt"
-    pos_data_set = solution.read_file(pos_filepath, "positive")
-    neg_data_set = solution.read_file(neg_filepath, "negative")
-    data_set = pos_data_set + neg_data_set
-    random.shuffle(data_set)
+    start = time.time()
 
-    test_num = len(data_set)//5
-    test_set = []
-    for i in range(test_num):
-        index = random.randint(1, len(data_set)-1)
-        test_set.append(data_set[index])
-        data_set.pop(index)
-    accuracy = solution.classify(data_set, test_set, 10)
-    print(accuracy)
+    solution = KNN()
+    train_pos = "./corpus/train_pos.txt"
+    train_neg = "./corpus/train_neg.txt"
+    test_pos = "./corpus/test_pos.txt"
+    test_neg = "./corpus/test_neg.txt"
+
+    train_set = solution.read_file(train_pos, "positive") + solution.read_file(train_neg, "negative")
+    test_set = solution.read_file(test_pos, "positive") + solution.read_file(test_neg, "negative")
+
+    accuracy = solution.classify(train_set, test_set, 10)
+    print("===========================================")
+    print("accuracy: {}".format(accuracy))
+    print("===========================================")
+
+    end = time.time()
+    print("exe_time: {}".format(end-start))
+
 
