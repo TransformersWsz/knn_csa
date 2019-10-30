@@ -11,3 +11,7 @@ implement the chinese sentiment analysis with knn algorithm
 
 ## similarity
 - cosine
+
+## note
+
+求两个 `set` 集合的相同元素，用 `a & b` 效率比自己手写高得多。

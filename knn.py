@@ -22,15 +22,11 @@ class KNN(object):
         l = regex.findall(sentence)
         return "".join(l)
 
-    def cosine(self, a: dict, b: dict) -> float:
+    def cosine(self, a: set, b: set) -> float:
         """计算两个向量的余弦距离"""
         mod_a = math.sqrt(len(a))
         mod_b = math.sqrt(len(b))
-
-        numerator = 0
-        for pos, val in a.items():
-            if pos in b:
-                numerator += 1
+        numerator = len(a & b)
         return numerator / (mod_a * mod_b)
 
     def read_file(self, filepath: str, polarity: str) -> list:
@@ -45,7 +41,7 @@ class KNN(object):
                 line = line.strip()
                 sentence = self.extract_chinese(line)
                 if len(sentence):
-                    sentence_vector = {}
+                    sentence_vector = set()
                     for i in range(len(sentence)-1):
                         single_word = sentence[i:i+1]
                         double_words = sentence[i:i+2]
@@ -55,11 +51,11 @@ class KNN(object):
                         if double_words not in self._word_dict:
                             self._word_dict[double_words] = len(self._word_dict)
 
-                        sentence_vector["{}".format(self._word_dict[single_word])] = 1
-                        sentence_vector["{}".format(self._word_dict[double_words])] = 1
+                        sentence_vector.add(self._word_dict[single_word])
+                        sentence_vector.add(self._word_dict[double_words])
                     if sentence[-1] not in self._word_dict:
                         self._word_dict[sentence[-1]] = len(self._word_dict)
-                    sentence_vector["{}".format(self._word_dict[sentence[-1]])] = 1
+                    sentence_vector.add(self._word_dict[sentence[-1]])
                     result.append((sentence_vector, polarity))
         return result
 
